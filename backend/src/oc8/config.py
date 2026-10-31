@@ -213,6 +213,9 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-secret-change-me-0123456789abcdef"
     jwt_alg: str = "HS256"
     jwt_ttl_seconds: int = 3600
+    #: Failed-attempt throttling on /auth/login and /auth/totp/verify
+    #: (oc8.auth.login_throttle). Only ever turned off by the test suite.
+    auth_throttle_enabled: bool = True
 
     # Web Push (VAPID key pair). One pair per instance, not a tenant secret.
     # Empty keys disable push sending (checked at send time, not startup).

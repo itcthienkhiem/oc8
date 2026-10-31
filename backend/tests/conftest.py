@@ -18,6 +18,11 @@ from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
+# Several suites boot the app with `is_dev` patched to False; with the public
+# default JWT secret, `oc8.main.refuse_insecure_jwt_secret` would (rightly)
+# refuse to start them. Set before any `Settings` is constructed.
+os.environ.setdefault("OC8_JWT_SECRET", "test-jwt-secret-" + "0123456789abcdef" * 3)
+
 from oc8.constants import ACME_TENANT_ID
 from oc8.db.engine import dispose_engine
 
@@ -175,6 +180,17 @@ def _reset_queue_singletons() -> Iterator[None]:
     yield
     queue_mod._queue = None
     ingest_mod._queue = None
+
+
+@pytest.fixture(autouse=True)
+def _disable_auth_throttle(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The login/TOTP failure counters live in Redis and would otherwise
+    accumulate across the whole suite (every wrong-password test shares one
+    container and the same client IP), turning later tests into 429s. Tests of
+    the throttle itself turn it back on (tests/auth/test_login_throttle.py)."""
+    from oc8.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "auth_throttle_enabled", False)
 
 
 @pytest.fixture(scope="session")

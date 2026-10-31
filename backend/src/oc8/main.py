@@ -48,6 +48,28 @@ def warn_about_unreachable_links(settings: Settings) -> None:
     )
 
 
+#: The literal default of `Settings.jwt_secret`, public in this repository.
+_DEFAULT_JWT_SECRET = "dev-secret-change-me-0123456789abcdef"
+
+
+def refuse_insecure_jwt_secret(settings: Settings) -> None:
+    """Stop a non-dev instance that would sign sessions with a public key.
+
+    Anybody who has read this repository knows the default `jwt_secret`, and
+    with it can mint an `org_admin` token for any tenant. Unlike the
+    localhost-link warning above, there is no situation where that is a
+    legitimate production setup, so this refuses to start rather than warns.
+    """
+    if settings.is_dev:
+        return
+    if settings.jwt_secret == _DEFAULT_JWT_SECRET or len(settings.jwt_secret) < 32:
+        raise RuntimeError(
+            "OC8_JWT_SECRET is unset, the public default, or shorter than 32 "
+            "characters. Set it to a random value (openssl rand -hex 32) before "
+            "running with OC8_ENV other than 'dev'."
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from oc8.observability import setup_observability, shutdown_observability
@@ -61,6 +83,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # ...and immediately after, because a warning emitted before setup_logging
     # would be discarded exactly like the ones that motivated that call.
     warn_about_unreachable_links(get_settings())
+    refuse_insecure_jwt_secret(get_settings())
 
     # Hook registries are per-tenant now (see oc8.hooks.registry.get_hook_registry)
     # and declare their core points lazily on first access -- there is no single

@@ -19,6 +19,7 @@ from oc8 import models as m
 from oc8.api.deps import CurrentPrincipal, DbSession, unguarded
 from oc8.api.v1.auth import PasswordSessionResponse
 from oc8.auth import Principal, get_identity_provider
+from oc8.auth.login_throttle import TOTP_THROTTLE
 from oc8.auth.totp import (
     generate_backup_codes,
     generate_secret,
@@ -278,6 +279,11 @@ async def totp_verify(
     """
     member_id = await _member_id_for(db, principal)
 
+    # Without a cap, a six-digit code is enumerable within one challenge
+    # token's lifetime, which defeats the second factor outright.
+    throttle_keys = TOTP_THROTTLE.keys(str(member_id))
+    await TOTP_THROTTLE.ensure_allowed(throttle_keys)
+
     # SELECT ... FOR UPDATE: this handler's read-modify-write of
     # `backup_codes` (checking `used_at`, then writing a burned entry back)
     # is NOT safe under plain READ COMMITTED without a row lock. Without one,
@@ -325,6 +331,7 @@ async def totp_verify(
                     matched_index = i
                     break
         if matched_index is None:
+            await TOTP_THROTTLE.record_failure(throttle_keys)
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid code.")
         updated_codes = list(cred.backup_codes)
         updated_codes[matched_index] = {
@@ -336,6 +343,7 @@ async def totp_verify(
         # to minting below with the row lock still held (released at commit).
 
     await db.commit()
+    await TOTP_THROTTLE.reset(throttle_keys)
 
     provider = get_identity_provider()
     # role=principal.role, NOT re-resolved from anywhere else: the challenge

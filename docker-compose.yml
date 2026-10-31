@@ -23,13 +23,10 @@ x-backend-image: &backend-image
 x-backend-env: &backend-env
   # SECURITY: `dev` enables POST /api/v1/auth/dev-login, an UNAUTHENTICATED
   # endpoint that mints an org_admin token for the seed tenant to ANYONE who
-  # calls it. On a host reachable from the internet that is a full auth bypass,
-  # not just a "test login". It is the default only because this stack exists to
-  # be brought up and tested quickly — so restrict the host at the network
-  # layer (firewall / VPN / bind Caddy to a private interface), OR set
-  # OC8_ENV=prod to require real password auth (POST /auth/setup /
-  # /auth/login). See docs/DEPLOY.md.
-  OC8_ENV: ${OC8_ENV:-dev}
+  # calls it. On a reachable host that is a full auth bypass, so the default
+  # here is `prod` (real password auth via POST /auth/setup / /auth/login).
+  # docker-compose.dev.yml sets `dev` explicitly for local hacking.
+  OC8_ENV: ${OC8_ENV:-prod}
   # Showcase mode: bilingual ACME seed + Demo badge. Prefer compose.demo.yml
   # (password login) or compose.dev.yml (local open login) over flipping this
   # alone on a reachable host.
