@@ -25,6 +25,7 @@ from oc8.modelrouter.types import (
     CompletionResult,
     ModelAdapter,
 )
+from oc8.net.ssrf import check_operator_endpoint
 from oc8.observability import record_model_latency
 
 
@@ -147,7 +148,14 @@ class ModelRouter:
         )
         return replace(req, messages=trimmed)
 
+    async def _check_base_url(self, req: CompletionRequest) -> None:
+        # A per-tenant base_url is operator input: LAN hosts are fine, cloud
+        # metadata and (outside dev) the container's own loopback are not.
+        if req.base_url:
+            await check_operator_endpoint(req.base_url, allow_loopback=self._settings.is_dev)
+
     async def complete(self, req: CompletionRequest) -> CompletionResult:
+        await self._check_base_url(req)
         adapter, resolved, canonical, model = self._guard_and_resolve(req)
         started = time.monotonic()
         try:
@@ -169,6 +177,7 @@ class ModelRouter:
         Latency is recorded when the stream finishes, so the number means
         "time to full answer" exactly as it does for a non-streamed call.
         """
+        await self._check_base_url(req)
         adapter, resolved, canonical, model = self._guard_and_resolve(req)
         started = time.monotonic()
         try:

@@ -33,7 +33,10 @@ x-backend-env: &backend-env
   OC8_DEMO: ${OC8_DEMO:-false}
   OC8_DATABASE_URL: postgresql+asyncpg://oc8_app:oc8@postgres:5432/oc8
   OC8_MIGRATION_URL: postgresql+psycopg://oc8_migrate:oc8@postgres:5432/oc8
-  OC8_REDIS_URL: redis://redis:6379/0
+  # Redis requires a password: every container on the default network (and any
+  # SSRF that reaches it) could otherwise read OAuth state and the run queue.
+  # Hex only -- it is embedded in this URL unescaped.
+  OC8_REDIS_URL: redis://:${OC8_REDIS_PASSWORD:?set OC8_REDIS_PASSWORD in .env}@redis:6379/0
   # Bundled S3-compatible object storage (file attachments). Bundled-by-default,
   # switchable via env: point these at any S3-compatible endpoint (AWS S3, R2,
   # etc.) in production instead of the bundled `minio` service above.
@@ -158,7 +161,17 @@ services:
     # when both are candidates) leaves the TTL-less run-intake stream
     # untouched, trading an occasional dropped login state (the user retries)
     # for never blocking a run.
-    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "volatile-ttl"]
+    command:
+      - redis-server
+      - --requirepass
+      - ${OC8_REDIS_PASSWORD:?set OC8_REDIS_PASSWORD in .env}
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - volatile-ttl
+    environment:
+      # Read by redis-cli (healthcheck, `docker compose exec redis redis-cli`).
+      REDISCLI_AUTH: ${OC8_REDIS_PASSWORD:?set OC8_REDIS_PASSWORD in .env}
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 3s

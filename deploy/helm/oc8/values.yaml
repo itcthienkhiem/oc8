@@ -40,11 +40,15 @@ secrets:
   jwtSecret: ""
   secretKek: ""
   postgresPassword: ""
+  # Hex only (embedded unescaped in the redis:// URL): openssl rand -hex 32
+  redisPassword: ""
 
 oc8:
-  # `dev` enables unauthenticated dev-login — never expose on the public internet.
-  env: dev
-  seedOnStart: true
+  # `prod` requires real password auth. `dev` enables unauthenticated
+  # dev-login (an org_admin token for anyone who asks) and seeds demo
+  # tenants — only ever for a throwaway local cluster.
+  env: prod
+  seedOnStart: false
   capasPath: /app/capas
   pythonPath: /app/capas/cli_harness
 

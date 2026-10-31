@@ -232,6 +232,7 @@ Set-EnvValueIfMissing "OC8_JWT_SECRET" (New-HexSecret 32)
 Set-EnvValueIfMissing "OC8_SECRET_KEK" (New-Base64Secret 32)
 Set-EnvValueIfMissing "POSTGRES_PASSWORD" (New-HexSecret 24)
 Set-EnvValueIfMissing "OC8_SANDBOX_PROVISIONER_TOKEN" (New-HexSecret 32)
+Set-EnvValueIfMissing "OC8_REDIS_PASSWORD" (New-HexSecret 32)
 Set-EnvValueIfMissing "OC8_CONTAINER_RUNTIME" $ContainerRuntime
 
 if ($ContainerRuntime -eq "podman") {

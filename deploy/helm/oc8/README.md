@@ -42,7 +42,7 @@ helm upgrade --install oc8 ./deploy/helm/oc8 \
   --namespace oc8 --create-namespace \
   --set secrets.jwtSecret="$OC8_JWT_SECRET" \
   --set secrets.secretKek="$OC8_SECRET_KEK" \
-  --set secrets.postgresPassword="$POSTGRES_PASSWORD"
+  --set secrets.postgresPassword="$POSTGRES_PASSWORD"   --set secrets.redisPassword="$(openssl rand -hex 32)"
 ```
 
 ### Capas (tool packs)
@@ -94,8 +94,8 @@ oc8:
 | Value | Purpose |
 |-------|---------|
 | `secrets.*` | Required JWT, KEK, Postgres password |
-| `oc8.env` | `dev` (default) or `prod` — disables dev-login when `prod` |
-| `oc8.seedOnStart` | Seed demo tenant on first migrate (default `true`) |
+| `oc8.env` | `prod` (default) or `dev` — `dev` enables unauthenticated dev-login; never on a reachable cluster |
+| `oc8.seedOnStart` | Seed demo tenant on first migrate (default `false`) |
 | `worker.replicas` | Scale workers (default `2`) |
 | `caddy.service.type` | `LoadBalancer` (default), `NodePort`, or `ClusterIP` |
 | `ingress.enabled` | Use Ingress instead of Caddy (set `caddy.enabled: false`) |

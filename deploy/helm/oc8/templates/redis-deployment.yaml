@@ -40,8 +40,16 @@ spec:
         - name: redis
           image: {{ .Values.images.redis.repository }}:{{ .Values.images.redis.tag }}
           imagePullPolicy: {{ .Values.images.redis.pullPolicy }}
+          env:
+            - name: REDISCLI_AUTH
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "oc8.fullname" . }}-secrets
+                  key: redis-password
           args:
             - redis-server
+            - --requirepass
+            - $(REDISCLI_AUTH)
             - --maxmemory
             - {{ .Values.redis.maxMemory | quote }}
             - --maxmemory-policy

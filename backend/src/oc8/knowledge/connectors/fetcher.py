@@ -1,26 +1,28 @@
+"""SSRF-guarded fetches for URLs an agent, a page or a pasted link can steer.
+
+`_guard` is a pre-flight check that fails fast with a readable error. The
+authoritative check is the transport (`oc8.net.ssrf.untrusted_transport`),
+which re-resolves and re-checks at connect time and connects to the address
+it checked -- a pre-flight check alone loses to DNS rebinding.
+"""
+
 from __future__ import annotations
 
-import ipaddress
 import socket
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from urllib.parse import urlparse
 
 import httpx
 
 from oc8.knowledge.connectors.base import ConnectorError
+from oc8.net.ssrf import BlockedDestinationError, is_public_ip, untrusted_transport
 
 _ALLOWED_SCHEMES = {"http", "https"}
 
 
 def _is_blocked_ip(ip: str) -> bool:
-    try:
-        addr = ipaddress.ip_address(ip)
-    except ValueError:
-        return True
-    return (
-        addr.is_loopback or addr.is_private or addr.is_link_local
-        or addr.is_reserved or addr.is_multicast or addr.is_unspecified
-        or not addr.is_global
-    )
+    return not is_public_ip(ip)
 
 
 def _resolve_ips(host: str) -> list[str]:
@@ -44,6 +46,20 @@ def _guard(url: str) -> None:
             raise ConnectorError(f"blocked host {host!r} -> {ip}")
 
 
+@asynccontextmanager
+async def _client(timeout: float) -> AsyncIterator[httpx.AsyncClient]:  # noqa: ASYNC109
+    try:
+        async with httpx.AsyncClient(
+            follow_redirects=False,
+            timeout=timeout,
+            transport=untrusted_transport(),
+            trust_env=False,
+        ) as client:
+            yield client
+    except BlockedDestinationError as exc:
+        raise ConnectorError(str(exc)) from exc
+
+
 async def safe_fetch_bytes(
     url: str,
     *,
@@ -61,7 +77,7 @@ async def safe_fetch_bytes(
     current = url
     for _ in range(max_redirects + 1):
         _guard(current)
-        async with httpx.AsyncClient(follow_redirects=False, timeout=timeout) as client:
+        async with _client(timeout) as client:
             async with client.stream("GET", current) as resp:
                 if resp.is_redirect and resp.has_redirect_location:
                     current = (
@@ -93,7 +109,7 @@ async def safe_fetch(
     current = url
     for _ in range(max_redirects + 1):
         _guard(current)
-        async with httpx.AsyncClient(follow_redirects=False, timeout=timeout) as client:
+        async with _client(timeout) as client:
             async with client.stream("GET", current) as resp:
                 if resp.is_redirect and resp.has_redirect_location:
                     current = (

@@ -21,8 +21,10 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
 
+from oc8.config import get_settings
 from oc8.constants import CORE_VERSION
 from oc8.modelrouter.types import NeutralTool
+from oc8.net.ssrf import check_operator_endpoint
 
 if TYPE_CHECKING:
     from typing import TextIO
@@ -261,6 +263,11 @@ class McpSession:
     async def __aenter__(self) -> McpSession:
         try:
             if self._transport == "http":
+                # LAN MCP servers are fine; cloud metadata and (outside dev)
+                # the backend's own loopback are not.
+                await check_operator_endpoint(
+                    self._server_url, allow_loopback=get_settings().is_dev
+                )
                 # Create an HTTP client with configured headers and timeout,
                 # then pass it to the streamable-HTTP transport.
                 http_client = await self._stack.enter_async_context(

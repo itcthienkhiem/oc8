@@ -101,8 +101,14 @@ app.kubernetes.io/component: {{ .component }}
   value: {{ printf "postgresql+asyncpg://oc8_app:oc8@%s:5432/oc8" (include "oc8.postgresHost" .) | quote }}
 - name: OC8_MIGRATION_URL
   value: {{ printf "postgresql+psycopg://oc8_migrate:oc8@%s:5432/oc8" (include "oc8.postgresHost" .) | quote }}
+- name: OC8_REDIS_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "oc8.fullname" . }}-secrets
+      key: redis-password
+# $(OC8_REDIS_PASSWORD) is expanded by Kubernetes from the entry above.
 - name: OC8_REDIS_URL
-  value: {{ printf "redis://%s:6379/0" (include "oc8.redisHost" .) | quote }}
+  value: {{ printf "redis://:$(OC8_REDIS_PASSWORD)@%s:6379/0" (include "oc8.redisHost" .) | quote }}
 - name: OC8_JWT_SECRET
   valueFrom:
     secretKeyRef:
