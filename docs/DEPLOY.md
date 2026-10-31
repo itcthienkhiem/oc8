@@ -83,10 +83,12 @@ npm run build
 ```bash
 cp .env.example .env
 
-# Fill the three required secrets:
+# Fill the required secrets:
 sed -i "s|^OC8_JWT_SECRET=.*|OC8_JWT_SECRET=$(openssl rand -hex 32)|" .env
 sed -i "s|^OC8_SECRET_KEK=.*|OC8_SECRET_KEK=$(openssl rand -base64 32)|" .env
 sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 16)|" .env
+sed -i "s|^OC8_REDIS_PASSWORD=.*|OC8_REDIS_PASSWORD=$(openssl rand -hex 32)|" .env
+sed -i "s|^OC8_SANDBOX_PROVISIONER_TOKEN=.*|OC8_SANDBOX_PROVISIONER_TOKEN=$(openssl rand -hex 32)|" .env
 
 # (macOS sed: use `sed -i ''` instead of `sed -i`.)
 

@@ -21,10 +21,11 @@ from typing import Any
 
 import httpx
 
-from oc8.config import Settings
+from oc8.config import Settings, get_settings
 from oc8.modelrouter.adapters.openai_compatible import OpenAICompatibleAdapter
 from oc8.modelrouter.http_errors import raise_for_status_with_body
 from oc8.modelrouter.registry import build_adapter
+from oc8.net.ssrf import BlockedDestinationError, check_operator_endpoint
 
 _TIMEOUT = 15.0
 
@@ -35,6 +36,10 @@ class DiscoveryError(Exception):
 
 
 async def _get_json(url: str, headers: dict[str, str]) -> dict[str, Any]:
+    try:
+        await check_operator_endpoint(url, allow_loopback=get_settings().is_dev)
+    except BlockedDestinationError as exc:
+        raise DiscoveryError(f"refusing to contact {url}: {exc}") from exc
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             resp = await client.get(url, headers=headers)

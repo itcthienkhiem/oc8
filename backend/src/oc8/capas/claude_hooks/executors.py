@@ -12,7 +12,9 @@ from typing import Any
 
 import httpx
 
-from oc8.capas.manifest import ClaudeHookAction, CLAUDE_HOOK_PERMISSIONS
+from oc8.capas.manifest import CLAUDE_HOOK_PERMISSIONS, ClaudeHookAction
+from oc8.config import get_settings
+from oc8.net.ssrf import BlockedDestinationError, check_operator_endpoint
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +110,11 @@ class ClaudeHookExecutors:
     async def _http(self, action: ClaudeHookAction, payload: dict[str, Any]) -> HookResult:
         url = action.url.strip()
         if not url:
+            return HookResult()
+        try:
+            await check_operator_endpoint(url, allow_loopback=get_settings().is_dev)
+        except BlockedDestinationError as exc:
+            logger.warning("Claude http hook refused: %s", exc)
             return HookResult()
         try:
             async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_S) as client:

@@ -247,6 +247,7 @@ set_env_value_if_missing "OC8_JWT_SECRET" "$(openssl rand -hex 32)"
 set_env_value_if_missing "OC8_SECRET_KEK" "$(openssl rand -base64 32 | tr -d '\n')"
 set_env_value_if_missing "POSTGRES_PASSWORD" "$(openssl rand -hex 24)"
 set_env_value_if_missing "OC8_SANDBOX_PROVISIONER_TOKEN" "$(openssl rand -hex 32)"
+set_env_value_if_missing "OC8_REDIS_PASSWORD" "$(openssl rand -hex 32)"
 set_env_value_if_missing "OC8_CONTAINER_RUNTIME" "$CONTAINER_RUNTIME"
 
 if [[ "$CONTAINER_RUNTIME" == "podman" ]]; then

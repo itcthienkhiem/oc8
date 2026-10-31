@@ -3,6 +3,7 @@ secrets:
   jwtSecret: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
   secretKek: "ZHVtbXktc2VjcmV0LWtlay1mb3ItY2ktb25seQ=="
   postgresPassword: "ci-postgres-password"
+  redisPassword: "0123456789abcdef0123456789abcdef"
 
 oc8:
   seedOnStart: false
