@@ -11,6 +11,16 @@
 # it (to "" when .env leaves OC8_DOMAIN empty) -- Caddy's default would never
 # fire, leaving an empty address and a config Caddy refuses to parse.
 {$OC8_DOMAIN} {
+	# Baseline browser hardening for every response. HSTS is only honoured by
+	# browsers over HTTPS, so it is harmless on the plain-HTTP IP setup.
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
 	# Backend: the API and the root-level liveness endpoint.
 	handle /api/* {
 		reverse_proxy backend:8099

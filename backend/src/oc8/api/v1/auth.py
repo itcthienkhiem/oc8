@@ -15,7 +15,7 @@ import hashlib
 import secrets
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,6 +26,7 @@ from oc8.api.v1._serializers import member_to_dto, seat_to_dto
 from oc8.api.v1.members import _member_dto
 from oc8.audit import append_event
 from oc8.auth import Principal, get_identity_provider
+from oc8.auth.login_throttle import LOGIN_ACCOUNT_THROTTLE, LOGIN_IP_THROTTLE, client_ip
 from oc8.auth.password import PasswordHashingError, hash_password, verify_password
 from oc8.auth.totp_gate import totp_gate
 from oc8.authz.permissions import MEMBER_ROLE
@@ -123,7 +124,7 @@ def _dev_only() -> None:
     "/auth/dev-login",
     response_model=TokenResponse,
     dependencies=[
-        Depends(unguarded("exists to be reachable without a token; PIN-gated and dev-only"))
+        Depends(unguarded("reachable without a token; dev-only (404 unless OC8_ENV=dev)"))
     ],
 )
 async def dev_login(body: DevLoginRequest) -> TokenResponse:
@@ -1050,7 +1051,7 @@ async def password_setup(body: PasswordSetupRequest) -> PasswordSessionResponse:
         Depends(unguarded("login is pre-auth; all checking is inside the endpoint"))
     ],
 )
-async def password_login(body: PasswordLoginRequest) -> PasswordSessionResponse:
+async def password_login(body: PasswordLoginRequest, request: Request) -> PasswordSessionResponse:
     """Authenticate a member via email + password.
 
     POST /auth/login verifies the email and password against the stored
@@ -1076,6 +1077,13 @@ async def password_login(body: PasswordLoginRequest) -> PasswordSessionResponse:
     No `db: DbSession` parameter here either -- see password_setup's docstring
     for why: it would silently demand a Bearer token that cannot exist yet.
     """
+    # Brute-force throttle, checked BEFORE any credential work so a locked-out
+    # caller learns nothing more (see oc8.auth.login_throttle).
+    account_keys = LOGIN_ACCOUNT_THROTTLE.keys(body.email)
+    ip_keys = LOGIN_IP_THROTTLE.keys(client_ip(request))
+    await LOGIN_ACCOUNT_THROTTLE.ensure_allowed(account_keys)
+    await LOGIN_IP_THROTTLE.ensure_allowed(ip_keys)
+
     # Resolve the singleton instance (unbound read, see password_setup)
     async with tenant_session(None) as unbound_db:
         org = await _get_singleton_organization(unbound_db)
@@ -1097,6 +1105,8 @@ async def password_login(body: PasswordLoginRequest) -> PasswordSessionResponse:
 
     # Fail closed: wrong email, missing password_hash, or soft-deleted member
     if member_id is None or password_hash is None:
+        await LOGIN_ACCOUNT_THROTTLE.record_failure(account_keys)
+        await LOGIN_IP_THROTTLE.record_failure(ip_keys)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password.",
@@ -1104,10 +1114,13 @@ async def password_login(body: PasswordLoginRequest) -> PasswordSessionResponse:
 
     # Verify password (constant-time comparison, returns bool not exception)
     if not verify_password(body.password, password_hash):
+        await LOGIN_ACCOUNT_THROTTLE.record_failure(account_keys)
+        await LOGIN_IP_THROTTLE.record_failure(ip_keys)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password.",
         )
+    await LOGIN_ACCOUNT_THROTTLE.reset(account_keys)
 
     # The token's `role` claim only matters when `org_member.role_id IS NULL`
     # (see authz/authority.py's module docstring: an assigned role_id is an

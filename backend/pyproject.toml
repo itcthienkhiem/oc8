@@ -35,7 +35,7 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "alembic>=1.14",
     "redis>=5.2",
-    "pyjwt>=2.10",
+    "pyjwt>=2.15.0",
     "httpx>=0.28",
     # Upper bound deliberate: mcp 2.0 renamed Tool.inputSchema to input_schema,
     # and an open bound pulled it in on a routine rebuild, breaking every tool
@@ -50,7 +50,7 @@ dependencies = [
     "python-multipart>=0.0.18",
     "jsonschema>=4",
     "packaging>=24",
-    "pypdf>=6.14.2",
+    "pypdf>=6.21.4",
     "croniter>=6.2.4",
     "cryptography>=43",
     "opentelemetry-sdk>=1.44.0",
